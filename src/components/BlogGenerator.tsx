@@ -452,11 +452,10 @@ export function BlogGenerator() {
       
       if (blogType === 'exam') {
         // Check if exam blog exists
-        const { data: existingBlog } = await supabase
+        const { data: existingBlogs } = await supabase
           .from('exam_blog')
           .select('id')
-          .eq('exam_id', selectedExam)
-          .single();
+          .eq('exam_id', selectedExam);
 
         const updateData = {
           [selectedComponent]: generatedContent,
@@ -464,12 +463,12 @@ export function BlogGenerator() {
           exam_id: selectedExam
         };
 
-        if (existingBlog) {
+        if (existingBlogs && existingBlogs.length > 0) {
           // Update existing blog
           const { error } = await supabase
             .from('exam_blog')
             .update(updateData)
-            .eq('id', existingBlog.id);
+            .eq('id', existingBlogs[0].id);
           
           if (error) throw error;
         } else {
@@ -490,11 +489,10 @@ export function BlogGenerator() {
         const courseName = courses.find(c => c.id === selectedCourse)?.name || '';
 
         // Check if course blog exists
-        const { data: existingBlog } = await supabase
+        const { data: existingBlogs } = await supabase
           .from('course_blog')
           .select('id')
-          .eq('course_id', selectedCourse)
-          .single();
+          .eq('course_id', selectedCourse);
 
         const updateData = {
           [selectedComponent]: generatedContent,
@@ -503,12 +501,12 @@ export function BlogGenerator() {
           exam_id: selectedExam
         };
 
-        if (existingBlog) {
+        if (existingBlogs && existingBlogs.length > 0) {
           // Update existing blog
           const { error } = await supabase
             .from('course_blog')
             .update(updateData)
-            .eq('id', existingBlog.id);
+            .eq('id', existingBlogs[0].id);
           
           if (error) throw error;
         } else {
@@ -545,11 +543,10 @@ export function BlogGenerator() {
       
       if (blogType === 'exam') {
         // Check if exam blog exists
-        const { data: existingBlog } = await supabase
+        const { data: existingBlogs } = await supabase
           .from('exam_blog')
           .select('id')
-          .eq('exam_id', examId)
-          .single();
+          .eq('exam_id', examId);
 
         const updateData = {
           [component]: content,
@@ -557,11 +554,11 @@ export function BlogGenerator() {
           exam_id: examId
         };
 
-        if (existingBlog) {
+        if (existingBlogs && existingBlogs.length > 0) {
           const { error } = await supabase
             .from('exam_blog')
             .update(updateData)
-            .eq('id', existingBlog.id);
+            .eq('id', existingBlogs[0].id);
           
           if (error) throw error;
         } else {
@@ -577,11 +574,10 @@ export function BlogGenerator() {
 
         const courseName = courses.find(c => c.id === courseId)?.name || '';
 
-        const { data: existingBlog } = await supabase
+        const { data: existingBlogs } = await supabase
           .from('course_blog')
           .select('id')
-          .eq('course_id', courseId)
-          .single();
+          .eq('course_id', courseId);
 
         const updateData = {
           [component]: content,
@@ -590,11 +586,11 @@ export function BlogGenerator() {
           exam_id: examId
         };
 
-        if (existingBlog) {
+        if (existingBlogs && existingBlogs.length > 0) {
           const { error } = await supabase
             .from('course_blog')
             .update(updateData)
-            .eq('id', existingBlog.id);
+            .eq('id', existingBlogs[0].id);
           
           if (error) throw error;
         } else {
@@ -647,13 +643,13 @@ export function BlogGenerator() {
 
     // Check if exam blog already exists and has content
     try {
-      const { data: existingBlog } = await supabase
+      const { data: existingBlogs } = await supabase
         .from('exam_blog')
         .select('*')
-        .eq('exam_id', selectedExam)
-        .single();
+        .eq('exam_id', selectedExam);
 
-      if (existingBlog) {
+      if (existingBlogs && existingBlogs.length > 0) {
+        const existingBlog = existingBlogs[0];
         const hasContent = EXAM_COMPONENTS.some(component => 
           existingBlog[component.key as keyof typeof existingBlog] && 
           String(existingBlog[component.key as keyof typeof existingBlog]).trim().length > 0
@@ -741,13 +737,13 @@ export function BlogGenerator() {
     const coursesToProcess = [];
     for (const course of courses) {
       try {
-        const { data: existingBlog } = await supabase
+        const { data: existingBlogs } = await supabase
           .from('course_blog')
           .select('*')
-          .eq('course_id', course.id)
-          .single();
+          .eq('course_id', course.id);
 
-        if (existingBlog) {
+        if (existingBlogs && existingBlogs.length > 0) {
+          const existingBlog = existingBlogs[0];
           const hasContent = COURSE_COMPONENTS.some(component => 
             existingBlog[component.key as keyof typeof existingBlog] && 
             String(existingBlog[component.key as keyof typeof existingBlog]).trim().length > 0
