@@ -645,6 +645,29 @@ export function BlogGenerator() {
       return;
     }
 
+    // Check if exam blog already exists and has content
+    try {
+      const { data: existingBlog } = await supabase
+        .from('exam_blog')
+        .select('*')
+        .eq('exam_id', selectedExam)
+        .single();
+
+      if (existingBlog) {
+        const hasContent = EXAM_COMPONENTS.some(component => 
+          existingBlog[component.key as keyof typeof existingBlog] && 
+          String(existingBlog[component.key as keyof typeof existingBlog]).trim().length > 0
+        );
+        
+        if (hasContent) {
+          const examName = exams.find(e => e.id === selectedExam)?.name || '';
+          setMessage(`Blog for ${examName} already has content. Skipping automation.`);
+          return;
+        }
+      }
+    } catch (error) {
+      console.log('No existing blog found, proceeding with automation');
+    }
     setIsAutomating(true);
     setMessage('Starting automated exam blog generation...');
     
@@ -714,8 +737,42 @@ export function BlogGenerator() {
       return;
     }
 
+    // Filter out courses that already have complete blogs
+    const coursesToProcess = [];
+    for (const course of courses) {
+      try {
+        const { data: existingBlog } = await supabase
+          .from('course_blog')
+          .select('*')
+          .eq('course_id', course.id)
+          .single();
+
+        if (existingBlog) {
+          const hasContent = COURSE_COMPONENTS.some(component => 
+            existingBlog[component.key as keyof typeof existingBlog] && 
+            String(existingBlog[component.key as keyof typeof existingBlog]).trim().length > 0
+          );
+          
+          if (!hasContent) {
+            coursesToProcess.push(course);
+          } else {
+            console.log(`Course ${course.name} already has content, skipping`);
+          }
+        } else {
+          coursesToProcess.push(course);
+        }
+      } catch (error) {
+        // No existing blog found, add to processing list
+        coursesToProcess.push(course);
+      }
+    }
+
+    if (coursesToProcess.length === 0) {
+      setMessage('All courses already have blog content. No automation needed.');
+      return;
+    }
     setIsAutomating(true);
-    setMessage('Starting automated course blog generation...');
+    setMessage(`Starting automated course blog generation for ${coursesToProcess.length} courses...`);
     
     const components = COURSE_COMPONENTS;
     let totalCompleted = 0;
@@ -727,10 +784,10 @@ export function BlogGenerator() {
       totalComponents: components.length,
       currentCourse: '',
       completedCourses: 0,
-      totalCourses: courses.length
+      totalCourses: coursesToProcess.length
     });
 
-    for (const course of courses) {
+    for (const course of coursesToProcess) {
       if (!isAutomating) break;
 
       setAutomationProgress(prev => ({
@@ -789,7 +846,7 @@ export function BlogGenerator() {
       );
 
       // Break between courses
-      if (isAutomating && courseIndex < courses.length) {
+      if (isAutomating && courseIndex < coursesToProcess.length) {
         await sleep(2000);
       }
     }
@@ -797,10 +854,10 @@ export function BlogGenerator() {
     setIsAutomating(false);
     setAutomationProgress(prev => ({
       ...prev,
-      completedCourses: courses.length
+      completedCourses: coursesToProcess.length
     }));
     setMessage(
-      `All courses automation completed! ✅ ${totalCompleted} total components generated across ${courses.length} courses.`
+      `All courses automation completed! ✅ ${totalCompleted} total components generated across ${coursesToProcess.length} courses.`
     );
   };
 

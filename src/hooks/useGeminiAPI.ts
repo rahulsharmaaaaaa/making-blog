@@ -13,24 +13,40 @@ const GEMINI_API_KEYS = [
 ];
 
 let currentKeyIndex = 0;
+let failedKeys = new Set<number>();
 
 const getNextApiKey = () => {
+  let attempts = 0;
+  while (attempts < GEMINI_API_KEYS.length) {
+    if (!failedKeys.has(currentKeyIndex)) {
+      const key = GEMINI_API_KEYS[currentKeyIndex];
+      const keyIndex = currentKeyIndex;
+      currentKeyIndex = (currentKeyIndex + 1) % GEMINI_API_KEYS.length;
+      return { key, keyIndex };
+    }
+    currentKeyIndex = (currentKeyIndex + 1) % GEMINI_API_KEYS.length;
+    attempts++;
+  }
+  // If all keys failed, reset and try again
+  failedKeys.clear();
   const key = GEMINI_API_KEYS[currentKeyIndex];
+  const keyIndex = currentKeyIndex;
   currentKeyIndex = (currentKeyIndex + 1) % GEMINI_API_KEYS.length;
-  return key;
+  return { key, keyIndex };
 };
 
 export const useGeminiAPI = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const generateContent = async (prompt: string, retries = 3): Promise<string> => {
+  const generateContent = async (prompt: string, maxRetries = 3): Promise<string> => {
     setLoading(true);
     setError(null);
 
-    for (let attempt = 0; attempt < retries; attempt++) {
+    let attempts = 0;
+    while (attempts < maxRetries) {
       try {
-        const apiKey = getNextApiKey();
+        const { key: apiKey, keyIndex } = getNextApiKey();
         const response = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
           {
@@ -60,14 +76,21 @@ export const useGeminiAPI = () => {
 
         if (!response.ok) {
           const errorText = await response.text();
-          console.error(`API request failed (attempt ${attempt + 1}):`, response.status, errorText);
+          console.error(`API request failed (attempt ${attempts + 1}) with key ${keyIndex}:`, response.status, errorText);
           
-          if (attempt === retries - 1) {
-            throw new Error(`API request failed after ${retries} attempts: ${response.status}`);
+          // Mark this key as failed if it's a quota/auth error
+          if (response.status === 429 || response.status === 403) {
+            failedKeys.add(keyIndex);
+            console.log(`Marking key ${keyIndex} as failed due to ${response.status}`);
           }
           
-          // Wait before retrying with exponential backoff
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+          attempts++;
+          if (attempts >= maxRetries) {
+            throw new Error(`API request failed after ${maxRetries} attempts: ${response.status}`);
+          }
+          
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, 1000));
           continue;
         }
 
@@ -81,9 +104,10 @@ export const useGeminiAPI = () => {
         setLoading(false);
         return content;
       } catch (err) {
-        console.error(`Error on attempt ${attempt + 1}:`, err);
+        console.error(`Error on attempt ${attempts + 1}:`, err);
         
-        if (attempt === retries - 1) {
+        attempts++;
+        if (attempts >= maxRetries) {
           const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
           setError(errorMessage);
           setLoading(false);
@@ -91,7 +115,7 @@ export const useGeminiAPI = () => {
         }
         
         // Wait before retrying
-        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
+        await new Promise(resolve => setTimeout(resolve, 1000));
       }
     }
     
